@@ -27,6 +27,7 @@ class StatsView @JvmOverloads constructor(
     private var fontSize = AndroidUtils.dp(context, 40F).toFloat()
     private var colors = emptyList<Int>()
     private var notFilledColor = 0
+    private var animationType = 0
 
     private var progress = 0F
     private var valueAnimator: ValueAnimator? = null
@@ -38,6 +39,7 @@ class StatsView @JvmOverloads constructor(
             val resId = getResourceId(R.styleable.StatsView_colors, 0)
             colors = resources.getIntArray(resId).toList()
             notFilledColor = getInt(R.styleable.StatsView_notFilledColor, Color.GRAY)
+            animationType = getInt(R.styleable.StatsView_animationType, 0)
         }
     }
 
@@ -88,20 +90,7 @@ class StatsView @JvmOverloads constructor(
 
         canvas.drawCircle(center.x, center.y, radius, notFilledPaint)
 
-        var startFrom = -90F
-        var percentData = 0F
-
-        for ((index, datum) in currentDataList.withIndex()) {
-            val percentDatumInData = datum / totalData
-            percentData += percentDatumInData
-            val angle = 360F * percentDatumInData
-            paint.color = colors.getOrNull(index) ?: randomColor()
-            canvas.drawArc(oval, startFrom + progress * 360, angle * progress, false, paint)
-            startFrom += angle
-        }
-
-//        paint.color = colors[0]
-//        canvas.drawPoint(center.x, center.y - radius, paint)
+        val percentData = currentDataList.sum() / totalData
 
         canvas.drawText(
             "%.2f%%".format(percentData * 100),
@@ -109,6 +98,61 @@ class StatsView @JvmOverloads constructor(
             center.y + textPaint.textSize / 4,
             textPaint,
         )
+
+        var startFrom = -90F
+
+        for ((index, datum) in currentDataList.withIndex()) {
+            val percentDatumInData = datum / totalData
+            val angle = 360F * percentDatumInData
+            paint.color = colors.getOrNull(index) ?: randomColor()
+
+            when (animationType) {
+
+                AnimationType.ROTATION.type -> {
+                    canvas.drawArc(
+                        oval,
+                        startFrom + progress * 360,
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                    if (progress == 1F) {
+                        paint.color = colors[0]
+                        canvas.drawPoint(center.x, center.y - radius, paint)
+                    }
+                }
+
+                AnimationType.SEQUENTIAL.type -> {
+                    if (progress < 0) return
+                    canvas.drawArc(
+                        oval,
+                        startFrom,
+                        angle * if (progress < percentDatumInData) progress / percentDatumInData else 1F,
+                        false,
+                        paint
+                    )
+                    progress -= percentDatumInData
+                    paint.color = colors[0]
+                    canvas.drawPoint(center.x, center.y - radius, paint)
+                }
+
+                AnimationType.BIDIRECTIONAL.type -> {
+                    canvas.drawArc(
+                        oval,
+                        startFrom + (angle - angle * progress) / 2,
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                    if (progress == 1F) {
+                        paint.color = colors[0]
+                        canvas.drawPoint(center.x, center.y - radius, paint)
+                    }
+                }
+            }
+
+            startFrom += angle
+        }
     }
 
     private fun update() {
@@ -116,8 +160,6 @@ class StatsView @JvmOverloads constructor(
             it.removeAllListeners()
             it.cancel()
         }
-        progress = 0F
-
         valueAnimator = ValueAnimator.ofFloat(0F, 1F).apply {
             addUpdateListener { anim ->
                 progress = anim.animatedValue as Float
@@ -128,6 +170,12 @@ class StatsView @JvmOverloads constructor(
         }.also {
             it.start()
         }
+    }
+
+    private enum class AnimationType(val type: Int) {
+        ROTATION(0),
+        SEQUENTIAL(1),
+        BIDIRECTIONAL(2)
     }
 
     private fun randomColor() = Random.nextInt(0xFF000000.toInt(), 0xFFFFFFFF.toInt())
