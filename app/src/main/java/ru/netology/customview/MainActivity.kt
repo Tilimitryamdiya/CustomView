@@ -11,12 +11,12 @@ class MainActivity : AppCompatActivity() {
 
         val statsView = findViewById<StatsView>(R.id.stats)
 
-        statsView.totalData = 3500F
+        statsView.totalData = 1000F
         statsView.currentDataList = listOf(
-            450F,
-            500F,
-            350F,
-            750F,
+            250F,
+            250F,
+            250F,
+            250F,
         )
 
 
